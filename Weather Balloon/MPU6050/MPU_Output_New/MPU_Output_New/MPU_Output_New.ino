@@ -8,7 +8,7 @@ float AccX, AccY, AccZ;
 float GyroX, GyroY, GyroZ;
 float accAngleX, accAngleY, gyroAngleX, gyroAngleY, gyroAngleZ;
 float roll, pitch, yaw;
-int16_t ax, ay, az,gx, gy, gz;
+int16_t ax, ay, az, gx, gy, gz;
 int AccErrorX, AccErrorY, AccErrorZ, GyroErrorX, GyroErrorY, GyroErrorZ, state = 0;
 int ax_offset,ay_offset,az_offset,gx_offset,gy_offset,gz_offset;
 float elapsedTime, currentTime, previousTime;
@@ -116,10 +116,10 @@ void loop() {
     accAngleX = (atan(AccY / sqrt(pow(AccX, 2) + pow(AccZ, 2))) * 180 / PI); 
     accAngleY = (atan(-1 * AccX / sqrt(pow(AccY, 2) + pow(AccZ, 2))) * 180 / PI);
     Serial.print("Roll: ");
-    Serial.print(0.9*gyroAngleX + 0.1*accAngleX); // combine gyro and accelerometer data
+    Serial.print(0.2*gyroAngleX + 0.8*accAngleX); // combine gyro and accelerometer data
     Serial.print(", ");
     Serial.print("Pitch: ");
-    Serial.print(0.9*gyroAngleY + 0.1*accAngleY); // combine gyro and accelerometer data
+    Serial.print(0.2*gyroAngleY + 0.8*accAngleY); // combine gyro and accelerometer data
     Serial.print(", ");
     Serial.print("Yaw: ");
     Serial.print(gyroAngleZ);
@@ -129,7 +129,7 @@ void loop() {
 //    Serial.print("AccAngleY: ");
 //    Serial.print(accAngleY);
     Serial.println("");
-    delay(2);
+    delay(5);
     }
 }
 
