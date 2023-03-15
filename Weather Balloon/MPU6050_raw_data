@@ -1,0 +1,86 @@
+#include <Wire.h>
+#include "MPU6050.h"
+#include "I2Cdev.h"
+#include <SD.h>
+
+
+
+int16_t ax, ay, az, gx, gy, gz;
+const int MPU = 0x68; // MPU6050 I2C address
+const int chipSelect = 4;
+long timer = 0;
+
+MPU6050 mpu(MPU);
+
+#define BLUE_LED_PIN 3   //set blue LED pin
+#define GREEN_LED_PIN 5 //set yellow LED pin
+#define RED_LED_PIN 6   //set red LED pin
+
+
+
+void setup() {
+  
+  Serial.begin(9600);
+  pinMode(BLUE_LED_PIN, OUTPUT);
+  pinMode(GREEN_LED_PIN, OUTPUT);
+  pinMode(RED_LED_PIN, OUTPUT);
+    while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
+  Serial.print("Initializing SD card...");
+
+  // see if the card is present and can be initialized:
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    while (1);
+  }
+  Serial.println("card initialized.");
+  SD.remove("datalog.txt");
+  Wire.begin(); 
+  mpu.initialize();
+  Serial.println(mpu.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+}
+
+void loop() {
+  delay(500);
+  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  Serial.println(timer);
+  Serial.println(ax);
+  Serial.println(ay);
+  Serial.println(az);
+  Serial.println(gx);
+  Serial.println(gy);
+  Serial.println(gz);
+  Serial.println();
+  
+  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+  if (dataFile) {
+    dataFile.print(ax);
+    dataFile.print(",");
+    dataFile.print(ay);
+    dataFile.print(",");
+    dataFile.print(az);
+    dataFile.print(",");
+    dataFile.print(gx);
+    dataFile.print(",");
+    dataFile.print(gy);
+    dataFile.print(",");
+    dataFile.print(gz);
+    dataFile.print(",");
+    dataFile.println("");
+    dataFile.close();
+    
+    digitalWrite(GREEN_LED_PIN, HIGH);
+    digitalWrite(RED_LED_PIN, LOW);
+    digitalWrite(BLUE_LED_PIN, LOW);
+    }
+   else {
+      Serial.println("error opening datalog.txt");
+      digitalWrite(GREEN_LED_PIN, LOW);
+      digitalWrite(RED_LED_PIN, HIGH);
+      digitalWrite(BLUE_LED_PIN, LOW);
+   }
+   timer = millis();
+  
+}
