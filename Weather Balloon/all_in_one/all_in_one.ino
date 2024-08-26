@@ -14,6 +14,10 @@ Adafruit_MS8607 ms8607;
 #include <SPI.h>
 #include <SD.h>
 
+#include "RTClib.h"
+
+RTC_PCF8523 rtc;
+
 #define COLLECT_NUMBER   20              // collect number, the collection range is 1-100
 #define Ozone_IICAddress OZONE_ADDRESS_3
 /*   iic slave Address, The default is ADDRESS_3
@@ -30,7 +34,18 @@ byte buffer[2] = {0,0};
 
 int status = 0;
 
-Adafruit_MAX31865 thermo = Adafruit_MAX31865(53, 51, 52, 50);
+const int RED = 27;
+const int GREEN = 25;
+const int BLUE = 23;
+
+bool ms8607_error = false;
+bool ozone_sensor_error = false;
+bool imu_error = false;
+bool sd_error = false;
+bool rtd_error = false;
+bool rtc_error = false;
+
+Adafruit_MAX31865 thermo = Adafruit_MAX31865(7, 6, 5, 4);
 
 // The value of the Rref resistor. Use 430.0 for PT100 and 4300.0 for PT1000
 #define RREF      430.0
@@ -45,88 +60,42 @@ File dataFile;
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) delay(10);     // will pause Zero, Leonardo, etc until serial console opens
-
-  Serial.println("Adafruit MS8607 test!");
-
-  // Try to initialize!
-  if (!ms8607.begin()) {
-    Serial.println("Failed to find MS8607 chip");
-    while (1) { delay(10); }
+  pinMode(RED, OUTPUT);
+  pinMode(GREEN, OUTPUT);
+  pinMode(BLUE, OUTPUT);
+  //while (!Serial) delay(10);     // will pause Zero, Leonardo, etc until serial console opens
+  for(int i = 0; i< 3;i++){
+     digitalWrite(GREEN, HIGH);
+     delay(500);
+     digitalWrite(GREEN, LOW);
+     delay(500);
   }
-  Serial.println("MS8607 Found!");
-
-  ms8607.setHumidityResolution(MS8607_HUMIDITY_RESOLUTION_OSR_8b);
-  Serial.print("Humidity resolution set to ");
-  switch (ms8607.getHumidityResolution()){
-    case MS8607_HUMIDITY_RESOLUTION_OSR_12b: Serial.println("12-bit"); break;
-    case MS8607_HUMIDITY_RESOLUTION_OSR_11b: Serial.println("11-bit"); break;
-    case MS8607_HUMIDITY_RESOLUTION_OSR_10b: Serial.println("10-bit"); break;
-    case MS8607_HUMIDITY_RESOLUTION_OSR_8b: Serial.println("8-bit"); break;
+  digitalWrite(BLUE, HIGH);
+  initialize_MS8607();
+  initialize_ozone();
+  initialize_gamma();
+  initialize_imu();
+  initialize_rtd();
+  initialize_sd();
+  initialize_rtc();
+  digitalWrite(BLUE, LOW);
+  for(int i = 0; i< 3; i++){
+     digitalWrite(GREEN, HIGH);
+     delay(500);
+     digitalWrite(GREEN, LOW);
+     delay(500);
   }
-  // ms8607.setPressureResolution(MS8607_PRESSURE_RESOLUTION_OSR_4096);
-  Serial.print("Pressure and Temperature resolution set to ");
-  switch (ms8607.getPressureResolution()){
-    case MS8607_PRESSURE_RESOLUTION_OSR_256: Serial.println("256"); break;
-    case MS8607_PRESSURE_RESOLUTION_OSR_512: Serial.println("512"); break;
-    case MS8607_PRESSURE_RESOLUTION_OSR_1024: Serial.println("1024"); break;
-    case MS8607_PRESSURE_RESOLUTION_OSR_2048: Serial.println("2048"); break;
-    case MS8607_PRESSURE_RESOLUTION_OSR_4096: Serial.println("4096"); break;
-    case MS8607_PRESSURE_RESOLUTION_OSR_8192: Serial.println("8192"); break;
-  }
-  Serial.println("");
-  while(!Ozone.begin(Ozone_IICAddress)) {
-  Serial.println("I2c device number error !");
-  delay(1000);
-  }  
-  Serial.println("I2c connect success !");
-  /*   Set iic mode, active mode or passive mode
-        MEASURE_MODE_AUTOMATIC            // active  mode
-        MEASURE_MODE_PASSIVE              // passive mode
-  */
-  Ozone.setModes(MEASURE_MODE_PASSIVE);
-  Wire.begin();
-  Serial.println("Gamma Sensor Sensing Start");
-
-  //Read Firmware version
-  Gamma_Mod_Read(0xB4);
-  //Reset before operating the sensor
-  Gamma_Mod_Read(0xA0);
-  Serial.println("================================================");
-  if (!IMU.begin()) {
-    Serial.println("Failed to initialize IMU!");
-    while (1);
-  }
-  thermo.begin(MAX31865_2WIRE);  // set to 2WIRE or 4WIRE as necessary
-
-   // Initialize SD card
-  if (!SD.begin(chipSelect)) {
-    Serial.println("SD card initialization failed!");
-    return;
-  }
-  Serial.println("SD card initialized successfully.");
-  dataFile = SD.open("datalog.txt", FILE_WRITE);
-  // Open a new file for writing
-  if (!dataFile) {
-    Serial.println("Error opening datalog.txt for writing.");
-    return;
-  }
-  else {
-  Serial.println("Logging data...");
-  dataFile.println("time(s), temp(C), pressure(hPa), humidity(%rH), ozone(PPB), radioactivity_10min(uSv/hr), radioactivity_1min(uSv/hr), ax, ay, az, gx, gy, gz, mx, my, mz, temp_RTC(C)");
-  dataFile.close();
-  } 
 }
 
 void loop() {
+  DateTime now = rtc.now();
   dataFile = SD.open("datalog.txt", FILE_WRITE);
-  unsigned long currentTime = millis();
-  int seconds_time = currentTime/1000;
-  dataFile.print(seconds_time);  dataFile.print(",");
+  dataFile.print(now.toString("YYYY-MM-DD hh:mm:ss"));  dataFile.print(",");
   Serial.println("----------------------------------------------------------------");
 
   sensors_event_t temp, pressure, humidity;
 
+  if(!ms8607_error){
   ms8607.getEvent(&pressure, &temp, &humidity);
   Serial.print("Temperature: ");Serial.print(temp.temperature); Serial.println(" degrees C");
   Serial.print("Pressure: ");Serial.print(pressure.pressure); Serial.println(" hPa");
@@ -134,27 +103,39 @@ void loop() {
   Serial.println("");
 
   dataFile.print(temp.temperature);  dataFile.print(",");  dataFile.print(pressure.pressure);  dataFile.print(",");  dataFile.print(humidity.relative_humidity);  dataFile.print(",");
-
+  }
+  else{
+    dataFile.print("nan, nan, nan");
+  }
   Serial.println("----------------------------------------------------------------");
-
+  if(!ozone_sensor_error){
   int16_t ozoneConcentration = Ozone.readOzoneData(COLLECT_NUMBER);
   Serial.print("Ozone concentration is ");
   Serial.print(ozoneConcentration);
   Serial.println(" PPB.");
 
   dataFile.print(ozoneConcentration);  dataFile.print(",");
-
+  }
+  else{
+    dataFile.print("nan");
+  }
   Serial.println("----------------------------------------------------------------");
-
+  
   //Read Statue, Measuring Time, Measuring Value
   Gamma_Mod_Read_Value();  
 
   Serial.println("----------------------------------------------------------------");
-  
-  IMU_Data();
+
+  if(!imu_error){
+    IMU_Data();
+  }
+  else{
+    dataFile.print("nan, nan, nan, nan, nan, nan, nan, nan, nan");
+  }
+
   
   Serial.println("----------------------------------------------------------------");
-
+  if(!rtd_error){
   uint16_t rtd = thermo.readRTD();
 
   Serial.print("RTD value: "); Serial.println(rtd);
@@ -165,35 +146,11 @@ void loop() {
   Serial.print("Temperature = "); Serial.println(thermo.temperature(RNOMINAL, RREF));
   dataFile.println(thermo.temperature(RNOMINAL, RREF));
 
-
-  // Check and print any faults
-  uint8_t fault = thermo.readFault();
-  if (fault) {
-    Serial.print("Fault 0x"); Serial.println(fault, HEX);
-    if (fault & MAX31865_FAULT_HIGHTHRESH) {
-      Serial.println("RTD High Threshold"); 
-    }
-    if (fault & MAX31865_FAULT_LOWTHRESH) {
-      Serial.println("RTD Low Threshold"); 
-    }
-    if (fault & MAX31865_FAULT_REFINLOW) {
-      Serial.println("REFIN- > 0.85 x Bias"); 
-    }
-    if (fault & MAX31865_FAULT_REFINHIGH) {
-      Serial.println("REFIN- < 0.85 x Bias - FORCE- open"); 
-    }
-    if (fault & MAX31865_FAULT_RTDINLOW) {
-      Serial.println("RTDIN- < 0.85 x Bias - FORCE- open"); 
-    }
-    if (fault & MAX31865_FAULT_OVUV) {
-      Serial.println("Under/Over voltage"); 
-    }
-    thermo.clearFault();
+  rtd_read_reset_error();
   }
-  Serial.println();
-
-
-  
+  else{
+    dataFile.println("nan");
+  }
   // Log data to the file
   dataFile.close();
   delay(1000);
@@ -256,6 +213,7 @@ void Print_Result(int cmd){
       }
       break;
     case 0xB2:
+      
       Serial.print("Measuring Value(10min avg)\t");
       value = buffer[0] + (float)buffer[1]/100;
       Serial.print(value); Serial.println(" uSv/hr");
@@ -339,4 +297,196 @@ void IMU_Data(){
     dataFile.print(mz);    dataFile.print(",");
 
   }
+}
+
+void initialize_MS8607(){
+  Serial.println("Adafruit MS8607 test!");
+  int counter = 0;
+  while (!ms8607.begin() && counter < 100) {
+    counter += 1;
+    delay(10);
+  }
+  if(counter == 100){
+     Serial.println("Failed to find MS8607 chip");
+     ms8607_error = true;
+     digitalWrite(GREEN, LOW);
+     digitalWrite(RED, HIGH);
+  }
+  else {
+    Serial.println("MS8607 Found!");
+  }
+    ms8607.setHumidityResolution(MS8607_HUMIDITY_RESOLUTION_OSR_8b);
+  Serial.print("Humidity resolution set to ");
+  switch (ms8607.getHumidityResolution()){
+    case MS8607_HUMIDITY_RESOLUTION_OSR_12b: Serial.println("12-bit"); break;
+    case MS8607_HUMIDITY_RESOLUTION_OSR_11b: Serial.println("11-bit"); break;
+    case MS8607_HUMIDITY_RESOLUTION_OSR_10b: Serial.println("10-bit"); break;
+    case MS8607_HUMIDITY_RESOLUTION_OSR_8b: Serial.println("8-bit"); break;
+  }
+  // ms8607.setPressureResolution(MS8607_PRESSURE_RESOLUTION_OSR_4096);
+  Serial.print("Pressure and Temperature resolution set to ");
+  switch (ms8607.getPressureResolution()){
+    case MS8607_PRESSURE_RESOLUTION_OSR_256: Serial.println("256"); break;
+    case MS8607_PRESSURE_RESOLUTION_OSR_512: Serial.println("512"); break;
+    case MS8607_PRESSURE_RESOLUTION_OSR_1024: Serial.println("1024"); break;
+    case MS8607_PRESSURE_RESOLUTION_OSR_2048: Serial.println("2048"); break;
+    case MS8607_PRESSURE_RESOLUTION_OSR_4096: Serial.println("4096"); break;
+    case MS8607_PRESSURE_RESOLUTION_OSR_8192: Serial.println("8192"); break;
+  }
+  Serial.println("");
+}
+
+void initialize_ozone(){
+  int counter = 0;
+  while(!Ozone.begin(Ozone_IICAddress) && counter < 100) {
+    counter += 1;
+    delay(10);
+  }
+  if(counter == 100){
+    Serial.println("Ozone sensor error !");
+    ozone_sensor_error = true;
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, LOW);
+    digitalWrite(RED, HIGH);
+  }
+  else{
+    Serial.println("Ozone sensor connect success !");
+  } 
+
+  /*   Set iic mode, active mode or passive mode
+        MEASURE_MODE_AUTOMATIC            // active  mode
+        MEASURE_MODE_PASSIVE              // passive mode
+  */
+  Ozone.setModes(MEASURE_MODE_PASSIVE);
+}
+
+void initialize_gamma(){
+  Wire.begin();
+  Serial.println("Gamma Sensor Sensing Start");
+  //Read Firmware version
+  Gamma_Mod_Read(0xB4);
+  //Reset before operating the sensor
+  Gamma_Mod_Read(0xA0);
+}
+
+void initialize_imu(){
+  int counter = 0;
+  while (!IMU.begin() && counter < 100) {
+    counter += 1;
+    delay(10);
+  }
+  if(counter == 100){
+    Serial.println("Failed to initialize IMU!");
+    digitalWrite(GREEN, LOW);
+    digitalWrite(RED, HIGH);
+    digitalWrite(BLUE, LOW);
+  }
+  else {
+    Serial.println("IMU connection success!");
+  }
+}
+
+void rtd_read_reset_error(){
+    // Check and print any faults
+  uint8_t fault = thermo.readFault();
+  if (fault) {
+    rtd_error = true;
+    digitalWrite(GREEN, LOW);
+    digitalWrite(RED, HIGH);
+    Serial.print("Fault 0x"); Serial.println(fault, HEX);
+    if (fault & MAX31865_FAULT_HIGHTHRESH) {
+      Serial.println("RTD High Threshold"); 
+    }
+    if (fault & MAX31865_FAULT_LOWTHRESH) {
+      Serial.println("RTD Low Threshold"); 
+    }
+    if (fault & MAX31865_FAULT_REFINLOW) {
+      Serial.println("REFIN- > 0.85 x Bias"); 
+    }
+    if (fault & MAX31865_FAULT_REFINHIGH) {
+      Serial.println("REFIN- < 0.85 x Bias - FORCE- open"); 
+    }
+    if (fault & MAX31865_FAULT_RTDINLOW) {
+      Serial.println("RTDIN- < 0.85 x Bias - FORCE- open"); 
+    }
+    if (fault & MAX31865_FAULT_OVUV) {
+      Serial.println("Under/Over voltage"); 
+    }
+    thermo.clearFault();
+  }
+  Serial.println();
+}
+
+void initialize_rtd(){
+  thermo.begin(MAX31865_2WIRE);  // set to 2WIRE or 4WIRE as necessary
+}
+
+void initialize_sd(){
+  int counter = 0;
+    // Initialize SD card
+  while (!SD.begin(chipSelect) && counter < 100) {
+    counter += 1;
+    delay(10);
+  }
+  if(counter == 100){
+    Serial.println("SD card initialization failed!");
+    sd_error = true;
+    digitalWrite(GREEN, LOW);
+    digitalWrite(RED, HIGH);
+    digitalWrite(BLUE, LOW);
+  }
+  else {
+    Serial.println("SD card initialized successfully.");
+  }
+  dataFile = SD.open("datalog.txt", FILE_WRITE);
+  // Open a new file for writing
+  if (!dataFile) {
+    Serial.println("Error opening datalog.txt for writing.");
+    sd_error = true;
+    digitalWrite(GREEN, LOW);
+    digitalWrite(RED, HIGH);
+    digitalWrite(BLUE, LOW);
+  }
+  else {
+  Serial.println("Logging data...");
+  dataFile.println("time(s), temp(C), pressure(hPa), humidity(%rH), ozone(PPB), radioactivity_10min(uSv/hr), radioactivity_1min(uSv/hr), ax, ay, az, gx, gy, gz, mx, my, mz, temp_RTC(C)");
+  dataFile.close();
+  }
+}
+
+void initialize_rtc(){
+  int counter = 0;
+  while (! rtc.begin() && counter < 100) {
+    counter += 1;
+    delay(10);
+    Serial.flush();
+  }
+  if(counter == 100){
+     Serial.println("Couldn't find RTC");
+     rtc_error = true;
+     digitalWrite(GREEN, LOW);
+     digitalWrite(BLUE, LOW);
+     digitalWrite(RED, HIGH);
+  }
+  else{
+    Serial.println("RTC connection success!");
+  }
+
+ 
+  if (! rtc.initialized() || rtc.lostPower()) {
+    Serial.println("RTC is NOT initialized, let's set the time!");
+    // When time needs to be set on a new device, or after a power loss, the
+    // following line sets the RTC to the date & time this sketch was compiled
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+    //
+    // Note: allow 2 seconds after inserting battery or applying external power
+    // without battery before calling adjust(). This gives the PCF8523's
+    // crystal oscillator time to stabilize. If you call adjust() very quickly
+    // after the RTC is powered, lostPower() may still return true.
+  }
+  
+  rtc.start();
 }
