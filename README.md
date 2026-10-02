@@ -1,42 +1,60 @@
-# ADA PCB
+# Atmospheric Data Acquisition - Weather Balloon
 
-ADA standing for Atmospheric Data Acquisition, the goal of this project is self-explanatory. 
-The following code is for a PCB that is able to collect information on temperature and air quality. It has self-motion awareness,
-can detect gamma rays and can even tell you the time. Isn't that amazing? Ben Lies did a fine programming job. Ben Kasel was a great mentor.
+Embedded firmware and custom PCB design for an atmospheric measurement payload, developed as a school project in Luxembourg.
 
-I don't expect many people to read this, so I won't go into too much detail...no detail at all.
-There is no person in the world who will try to reproduce this project, so why bother? I am taking a page out of the programmer's book, who never comments his code, expecting the same.
+**My contribution:** firmware development, PCB design and technical project delivery. The project brought together sensor integration, data logging, electronics assembly and launch preparation.
 
+## Flight outcome
 
+The original team log records a launch from Redange on **14 September 2024**, followed by recovery near Verdun, France, roughly two hours later. The payload, camera and SD card were recovered intact. The flight dataset is not included in this repository.
 
-## Reminder for the future self
-The real purpose of this readme file is to serve as a memory. 
+## Engineering work
 
-This project may have officially started 1 year ago (early 2023), but the stepping stone was laid in 2020 (maybe even earlier).
-We originally wanted our first project to be a weather balloon, but couldn't as it was too expensive. So, we built a rocket.
-It surely had its ups and downs in many ways and who knew: we did it. 
- 
-  Students learned programming.
-  Students learned to solder.
-  Students learned frustration.
-  Students repeated, until:
-  Students built a rocket.
+- Integrated environmental and motion sensors using I�C and SPI.
+- Developed Arduino sketches for individual sensor checks and combined acquisition.
+- Implemented timestamped SD-card logging and LED status indications.
+- Designed the data-logger schematic and board layout in EAGLE.
 
-Somehow, quite unexpectedly after that, we were asked to join a project by our professor Ben Kasel. A computer for a weather balloon for the LIST needed to be made and required all the knowledge of the previous project. It is scheduled to be used on Septmeber 14th 2024 in Redange. As this is in the future from the perspective of this article, we will find out if it worked or not. I will add a note beneath this one.
+## Start here
 
-*15.09.2024
-We are one day after launch and it couldn't have worked better. We had clear, warm and not too windy weather. The balllon started at around 14:06 and landed around 2 h afterwards in Verdune (France). Professional opinions claimed it should have landed around Metz. I didn't bother to confirm how far that is from Verdune, but far enough for me to think that Metz wasn't close to it. Verdun is famous for its gardens, and apparently big forests. Our search was luckily facilitated by a precise GPS signal. The box was completely intact because of trees which damped the fall by holding on to the parachute. Everything was able to be recovered without issue: the GoPro, the micro sd card with all our data on and even the little "Bompel" figurine on the outside of the box. What a champ. All acquired information will be available on github. I should perhaps work on this readme file a little better. MAybe some students in the future might try to upgrade our project. Dear future students, please hit us up if you plan on doing so.
+| Area | Files | What to review |
+| --- | --- | --- |
+| Combined acquisition | [`all_in_one.ino`](Prep_launch/Module_software_tests/all_in_one/all_in_one.ino) | Environmental sensors, IMU, ozone, gamma sensor, PT100, RTC and SD integration |
+| Smaller logger variant | [`Final_Code.ino`](Prep_launch/Final%20Code/Final_Code.ino) | BMP280 + MPU6050 acquisition and CSV-style logging |
+| Hardware | [PCB files](Prep_launch/PCB) | EAGLE `.sch` schematic and `.brd` layout |
+| Component experiments | [Module tests](Prep_launch/Module_software_tests) | Isolated checks and calibration sketches |
 
+## Hardware and dependencies
 
-Organising, communication, troubleshooting have been done by Ben Kasel. 
-Programming, designing the PCB and "carrying the project" have been done by Ben Lies.
-Soldering, supportive commentary and writing (like this article) have been done by Mayers Christophe.
-The project included more people...I should show them the same courtesy I did to myself: add their name to this file. I guess I will do that in the future. 
+The repository contains several hardware revisions. Select dependencies for the sketch you are examining; the sketches are not interchangeable.
 
-Stuff for me to do:
-* Upgrade & digitalise documents on PCB preparations
-* Update Bene's code and make it userfriendly + explain what dependencies ought to be used.  
-* Ask Bene for his PCB design sheet, put it on there as well
+| Sketch | Components / libraries |
+| --- | --- |
+| `all_in_one.ino` | Adafruit MS8607, Adafruit Unified Sensor, DFRobot OzoneSensor, Arduino LSM9DS1, Adafruit MAX31865, RTClib, SD, Wire and SPI; GDK101 access is implemented in the sketch |
+| `Final_Code.ino` | MPU6050_light, Adafruit BMP280 and its dependencies, SD, Wire and SPI |
 
-* organise this mess of a project: pre-launch, launch, post launch
-* add zipp folder with all the stizzel, one seperate file with the actual data of the flight
+Use the Arduino IDE and a board core compatible with the selected hardware. Board selection, library versions, wiring and calibration must be matched to the original build; a reproducible build configuration is not yet recorded.
+
+## Working with the code
+
+1. Start with the individual [module tests](Prep_launch/Module_software_tests) to understand each peripheral.
+2. Install the libraries used by your chosen sketch.
+3. Match sensor addresses, chip-select pins and LED pins to the board schematic.
+4. Open the sketch in the Arduino IDE, keeping any companion `.h` and `.cpp` files together.
+5. Check serial output and SD logging on the bench before combining peripherals.
+
+The folder name `Final Code` describes a historical revision. Its sketch uses BMP280 and MPU6050 sensors; the broader acquisition sketch lives under `Module_software_tests/all_in_one`.
+
+## Project status
+
+This repository preserves the project firmware and PCB sources. It includes experiments as well as integrated sketches, rather than a single packaged application. Measured sensor accuracy, exact dependency versions and flight-data analysis are not documented here.
+
+## Team and acknowledgements
+
+- **Ben Lies:** programming, PCB design and technical project delivery.
+- **Ben Kasel:** mentoring, organisation, communication and troubleshooting.
+- **Christophe Mayers:** soldering, project support and the original written project log.
+
+The original log also mentions additional participants without naming them. This list reflects the credits currently documented in the repository.
+
+[Original project log](https://github.com/BigblenHD/Weather-balloon/blob/688e36f4c935f01a88b4a0122774435af6ce9a63/README.md) � [Ben's portfolio](https://benlies.com)
