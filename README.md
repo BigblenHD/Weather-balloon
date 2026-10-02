@@ -1,4 +1,4 @@
-# Atmospheric Data Acquisition - Weather Balloon
+# Atmospheric Data Acquisition — Weather Balloon
 
 Embedded firmware and custom PCB design for an atmospheric measurement payload, developed as a school project in Luxembourg.
 
@@ -10,7 +10,7 @@ The original team log records a launch from Redange on **14 September 2024**, fo
 
 ## Engineering work
 
-- Integrated environmental and motion sensors using I�C and SPI.
+- Integrated environmental and motion sensors using I²C and SPI.
 - Developed Arduino sketches for individual sensor checks and combined acquisition.
 - Implemented timestamped SD-card logging and LED status indications.
 - Designed the data-logger schematic and board layout in EAGLE.
@@ -57,4 +57,4 @@ This repository preserves the project firmware and PCB sources. It includes expe
 
 The original log also mentions additional participants without naming them. This list reflects the credits currently documented in the repository.
 
-[Original project log](https://github.com/BigblenHD/Weather-balloon/blob/688e36f4c935f01a88b4a0122774435af6ce9a63/README.md) � [Ben's portfolio](https://benlies.com)
+[Original project log](https://github.com/BigblenHD/Weather-balloon/blob/688e36f4c935f01a88b4a0122774435af6ce9a63/README.md) · [Ben's portfolio](https://benlies.com)
